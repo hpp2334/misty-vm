@@ -7,7 +7,7 @@ edition = "2021"
 
 
 [dependencies]
-misty-vm = { path = "../misty-vm" }
+misty-vm = { version = "0.1", path = "../misty-vm" }
 tracing = "0.1"
 
 [dev-dependencies]
