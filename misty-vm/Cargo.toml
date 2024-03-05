@@ -9,7 +9,7 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 misty-vm-macro = { version = "0.1", path = "../misty-vm-macro" }
-tokio = { version = "1", features = [] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 tracing = "0.1"
 thread_local = "1.1.7"
 once_cell = "1.18.0"
