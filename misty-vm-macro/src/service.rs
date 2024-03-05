@@ -5,7 +5,6 @@ use syn::{
     parse2,
 };
 
-#[derive(Debug)]
 struct ServiceStruct {
     marker_token: Ident,
     _comma: syn::Token![,],
@@ -24,8 +23,7 @@ impl Parse for ServiceStruct {
 
 pub fn parse_misty_service(input: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
     let input = parse2::<ServiceStruct>(input);
-    if input.is_err() {
-        let err = input.unwrap_err();
+    if let Err(err) = input {
         panic!("parse misty service error: {}", err);
     }
     let input = input.unwrap();

@@ -5,8 +5,6 @@ use syn::{
     punctuated::Punctuated,
 };
 
-#[derive(Debug)]
-
 struct StatesStruct {
     states: Punctuated<syn::Type, syn::Token![,]>,
 }
@@ -21,8 +19,7 @@ impl Parse for StatesStruct {
 
 pub fn parse_misty_states(input: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
     let input = parse2::<StatesStruct>(input);
-    if input.is_err() {
-        let err = input.unwrap_err();
+    if let Err(err) = input {
         panic!("parse misty state error: {}", err);
     }
 
