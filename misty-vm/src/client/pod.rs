@@ -75,6 +75,10 @@ where
         }
     }
 
+    pub fn destroy(&self) {
+        self.inner().destroy();
+    }
+
     pub fn create(
         &self,
         view_manager: MistyViewModelManager<R>,
