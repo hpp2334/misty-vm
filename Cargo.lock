@@ -102,7 +102,7 @@ dependencies = [
 
 [[package]]
 name = "misty-vm"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "misty-vm-macro",
  "once_cell",
