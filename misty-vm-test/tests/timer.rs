@@ -2,10 +2,10 @@ use std::{convert::Infallible, time::Duration};
 
 use misty_vm::{
     async_task::MistyAsyncTaskTrait, controllers::MistyControllerContext, misty_service,
-    states::MistyStateTrait, MistyAsyncTask,
+    states::MistyStateTrait, MistyAsyncTask, MistyState,
 };
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, MistyState)]
 struct GlobalState {
     pub host_time: i64,
 }

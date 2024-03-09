@@ -6,6 +6,8 @@ use misty_vm::{controllers::MistyControllerContext, states::MistyStateTrait};
 mod global_states {
     use std::collections::{HashMap, HashSet};
 
+    use misty_vm::MistyState;
+
     #[derive(Debug, Clone)]
     pub struct TodolistItem {
         pub id: i32,
@@ -13,17 +15,17 @@ mod global_states {
         pub done: bool,
     }
 
-    #[derive(Debug, Clone, Default)]
+    #[derive(Debug, Clone, Default, MistyState)]
     pub struct TodolistState {
         pub map: HashMap<i32, TodolistItem>,
     }
 
-    #[derive(Debug, Clone, Default)]
+    #[derive(Debug, Clone, Default, MistyState)]
     pub struct CheckedState {
         pub set: HashSet<i32>,
     }
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, MistyState)]
     pub struct TodolistAllocState {
         pub alloc: i32,
     }

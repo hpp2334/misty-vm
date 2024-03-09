@@ -2,16 +2,16 @@ use std::{collections::HashMap, convert::Infallible};
 
 use misty_vm::client::AsMistyClientHandle;
 use misty_vm::states::MistyStateTrait;
-use misty_vm::MistyAsyncTask;
 use misty_vm::{
     async_task::MistyAsyncTaskTrait, controllers::MistyControllerContext, misty_service,
 };
+use misty_vm::{MistyAsyncTask, MistyState};
 use rand::{
     distributions::{Distribution, Uniform},
     Rng,
 };
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, MistyState)]
 struct GlobalState {
     pub store: HashMap<i32, bool>,
     pub done: bool,
@@ -343,13 +343,17 @@ mod test {
             });
         }
 
+        tracing::info!("before join_set");
         while let Some(_) = join_set.join_next().await {}
+
+        tracing::info!("before wait all");
         {
             let app = test_app.app();
             join_set.spawn(async move {
                 let _ = app.call_controller(controller_wait_all, ());
             });
         }
+        tracing::info!("after wait all");
         while let Some(_) = join_set.join_next().await {}
         let done = wait_done(&test_app).await;
         assert_eq!(done, true);
