@@ -343,17 +343,14 @@ mod test {
             });
         }
 
-        tracing::info!("before join_set");
         while let Some(_) = join_set.join_next().await {}
 
-        tracing::info!("before wait all");
         {
             let app = test_app.app();
             join_set.spawn(async move {
                 let _ = app.call_controller(controller_wait_all, ());
             });
         }
-        tracing::info!("after wait all");
         while let Some(_) = join_set.join_next().await {}
         let done = wait_done(&test_app).await;
         assert_eq!(done, true);

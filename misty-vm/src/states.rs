@@ -67,7 +67,7 @@ pub trait RefMistyStates {
 }
 
 macro_rules! impl_ref_states_tuple {
-    ($($t:ident),+) => {
+    ($($n:tt, $t:ident),+) => {
         #[allow(unused_parens)]
         impl<$($t),+> RefMistyStates for ($(&$t),+)
         where
@@ -82,35 +82,42 @@ macro_rules! impl_ref_states_tuple {
                 Self: Sized,
             {
                 let states = cx.states();
-                handler((
+                let t = (
+                    $(states.get::<$t>()),+,
+                );
+                let t = (
+                    $(t.$n.downcast()),+,
+                );
+                let t = (
                     $(
-                        {
-                            let state = states.get::<$t>();
-                            let state = state.downcast();
-                            let state = state.get();
-                            unsafe {
-                                extend_lifetime(state)
-                            }
+                        unsafe {
+                            extend_lifetime(t.$n.get())
                         }
                     ),+
-                ))
+                );
+
+                handler(t)
             }
         }
     };
 }
 
-impl_ref_states_tuple!(T1);
-impl_ref_states_tuple!(T1, T2);
-impl_ref_states_tuple!(T1, T2, T3);
-impl_ref_states_tuple!(T1, T2, T3, T4);
-impl_ref_states_tuple!(T1, T2, T3, T4, T5);
-impl_ref_states_tuple!(T1, T2, T3, T4, T5, T6);
-impl_ref_states_tuple!(T1, T2, T3, T4, T5, T6, T7);
-impl_ref_states_tuple!(T1, T2, T3, T4, T5, T6, T7, T8);
-impl_ref_states_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9);
-impl_ref_states_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10);
-impl_ref_states_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11);
-impl_ref_states_tuple!(T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12);
+impl_ref_states_tuple!(0, T1);
+impl_ref_states_tuple!(0, T1, 1, T2);
+impl_ref_states_tuple!(0, T1, 1, T2, 2, T3);
+impl_ref_states_tuple!(0, T1, 1, T2, 2, T3, 3, T4);
+impl_ref_states_tuple!(0, T1, 1, T2, 2, T3, 3, T4, 4, T5);
+impl_ref_states_tuple!(0, T1, 1, T2, 2, T3, 3, T4, 4, T5, 5, T6);
+impl_ref_states_tuple!(0, T1, 1, T2, 2, T3, 3, T4, 4, T5, 5, T6, 6, T7);
+impl_ref_states_tuple!(0, T1, 1, T2, 2, T3, 3, T4, 4, T5, 5, T6, 6, T7, 7, T8);
+impl_ref_states_tuple!(0, T1, 1, T2, 2, T3, 3, T4, 4, T5, 5, T6, 6, T7, 7, T8, 8, T9);
+impl_ref_states_tuple!(0, T1, 1, T2, 2, T3, 3, T4, 4, T5, 5, T6, 6, T7, 7, T8, 8, T9, 9, T10);
+impl_ref_states_tuple!(
+    0, T1, 1, T2, 2, T3, 3, T4, 4, T5, 5, T6, 6, T7, 7, T8, 8, T9, 9, T10, 10, T11
+);
+impl_ref_states_tuple!(
+    0, T1, 1, T2, 2, T3, 3, T4, 4, T5, 5, T6, 6, T7, 7, T8, 8, T9, 9, T10, 10, T11, 11, T12
+);
 
 #[derive(Debug, Clone)]
 struct BoxedState {
