@@ -1,6 +1,7 @@
 use std::{collections::HashMap, convert::Infallible};
 
 use misty_vm::client::AsMistyClientHandle;
+use misty_vm::services::MistyServiceTrait;
 use misty_vm::states::MistyStateTrait;
 use misty_vm::{
     async_task::MistyAsyncTaskTrait, controllers::MistyControllerContext, misty_service,

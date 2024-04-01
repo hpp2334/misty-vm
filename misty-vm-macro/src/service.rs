@@ -32,14 +32,13 @@ pub fn parse_misty_service(input: proc_macro2::TokenStream) -> proc_macro2::Toke
     let impl_name = input.impl_token;
 
     let output: proc_macro2::TokenStream = quote! {
-        use misty_vm::services::*;
-        use misty_vm::once_cell::sync::Lazy;
-        use std::sync::Arc;
-
         pub struct #marker_name {
             ptr: Box<dyn #impl_name>,
         }
         const _: () = {
+            use misty_vm::services::*;
+            use misty_vm::once_cell::sync::Lazy;
+            use std::sync::Arc;
             impl MistyServiceTrait for #marker_name {
 
             }

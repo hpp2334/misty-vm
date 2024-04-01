@@ -1,8 +1,7 @@
 use std::{convert::Infallible, time::Duration};
 
 use misty_vm::{
-    async_task::MistyAsyncTaskTrait, controllers::MistyControllerContext, misty_service,
-    states::MistyStateTrait, MistyAsyncTask, MistyState,
+    async_task::MistyAsyncTaskTrait, controllers::MistyControllerContext, misty_service, services::MistyServiceTrait, states::MistyStateTrait, MistyAsyncTask, MistyState
 };
 
 #[derive(Debug, Default, Clone, MistyState)]
