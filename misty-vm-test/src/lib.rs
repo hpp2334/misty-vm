@@ -4,7 +4,7 @@ use std::{
 };
 
 use misty_vm::{
-    client::SingletonMistyClientPod,
+    client::{MistyClientAccessor, SingletonMistyClientPod},
     controllers::{ControllerRet, MistyController},
     resources::{MistyResourceId, ResourceUpdateAction},
     services::MistyServiceManager,
@@ -60,6 +60,10 @@ where
     pub fn get_resource(&self, id: MistyResourceId) -> Option<Vec<u8>> {
         let w = self.resources.lock().unwrap();
         w.get(&id).map(|r| r.clone())
+    }
+
+    pub fn accessor(&self) -> MistyClientAccessor {
+        self.app.accessor()
     }
 
     fn apply(&self, ret: ControllerRet<R>) {
