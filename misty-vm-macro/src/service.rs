@@ -37,7 +37,6 @@ pub fn parse_misty_service(input: proc_macro2::TokenStream) -> proc_macro2::Toke
         }
         const _: () = {
             use misty_vm::services::*;
-            use misty_vm::once_cell::sync::Lazy;
             use std::sync::Arc;
             impl MistyServiceTrait for #marker_name {
 

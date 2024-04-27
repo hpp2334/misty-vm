@@ -10,4 +10,3 @@ pub(crate) mod utils;
 pub mod views;
 
 pub use misty_vm_macro::{misty_service, misty_states, MistyAsyncTask, MistyState};
-pub use once_cell;

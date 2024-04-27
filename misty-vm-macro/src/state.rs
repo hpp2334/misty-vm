@@ -31,7 +31,6 @@ pub fn parse_misty_states(input: proc_macro2::TokenStream) -> proc_macro2::Token
         {
             use misty_vm::client::MistyClientId;
             use misty_vm::states::{States};
-            use misty_vm::once_cell::sync::Lazy;
             use std::collections::HashMap;
             use std::sync::RwLock;
 

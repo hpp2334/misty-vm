@@ -10,7 +10,6 @@ pub fn parse_misty_async_task_derive(input: proc_macro2::TokenStream) -> proc_ma
         const _: () = {
             use misty_vm::client::MistyClientId;
             use misty_vm::async_task::*;
-            use misty_vm::once_cell::sync::Lazy;
             use std::collections::HashMap;
             use std::sync::RwLock;
 
