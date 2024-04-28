@@ -1,6 +1,6 @@
 [package]
 name = "misty-vm-macro"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 description = "Macros of misty-vm."
 license = "MIT OR Apache-2.0"
