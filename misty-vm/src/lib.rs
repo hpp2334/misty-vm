@@ -9,4 +9,5 @@ pub mod states;
 pub(crate) mod utils;
 pub mod views;
 
+pub use futures::future::{BoxFuture, LocalBoxFuture};
 pub use misty_vm_macro::{misty_service, misty_states, MistyAsyncTask, MistyState};

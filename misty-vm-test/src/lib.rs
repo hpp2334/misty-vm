@@ -1,9 +1,11 @@
 use std::{
     collections::HashMap,
-    sync::{Arc, Mutex},
+    sync::{atomic::AtomicU64, Arc, Mutex},
 };
 
+use futures::future::BoxFuture;
 use misty_vm::{
+    async_task::IAsyncTaskRuntimeAdapter,
     client::{MistyClientAccessor, SingletonMistyClientPod},
     controllers::{ControllerRet, MistyController},
     resources::{MistyResourceId, ResourceUpdateAction},
@@ -28,6 +30,44 @@ where
     R: Clone + Default,
 {
     app: TestAppContainer<R>,
+}
+
+pub struct TokioAsyncTaskAdapter<R>
+where
+    R: Clone + Default,
+{
+    _app: TestAppContainer<R>,
+    alloc: AtomicU64,
+    store: Arc<Mutex<HashMap<u64, tokio::task::JoinHandle<()>>>>,
+}
+
+impl<R> IAsyncTaskRuntimeAdapter for TokioAsyncTaskAdapter<R>
+where
+    R: Clone + Default + Send + Sync,
+{
+    fn spawn(&self, future: BoxFuture<'static, ()>) -> u64 {
+        let handle = tokio::spawn(future);
+        let id = self.alloc.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        {
+            let mut w = self.store.lock().unwrap();
+            w.insert(id, handle);
+        }
+        id
+    }
+
+    fn spawn_local(&self, future: futures::prelude::future::LocalBoxFuture<'static, ()>) -> u64 {
+        panic!("spawn_local is not implemented yet");
+    }
+
+    fn try_abort(&self, task_id: u64) {
+        let handle = {
+            let mut w = self.store.lock().unwrap();
+            w.remove(&task_id)
+        };
+        if let Some(handle) = handle {
+            handle.abort();
+        }
+    }
 }
 
 impl<R> TestAppContainer<R>
@@ -100,9 +140,15 @@ where
         state_manager: MistyStateManager,
         app_container: TestAppContainer<R>,
     ) -> Self {
+        let adapter = TokioAsyncTaskAdapter {
+            _app: app_container.clone(),
+            alloc: Default::default(),
+            store: Default::default(),
+        };
+
         app_container
             .app
-            .create(view_manager, state_manager, service_manager);
+            .create(view_manager, state_manager, service_manager, adapter);
 
         let cloned = app_container.clone();
         app_container.app.on_signal(move |signal| match signal {

@@ -5,7 +5,7 @@ use std::{
     sync::{atomic::AtomicU64, Arc, RwLock, Weak},
 };
 
-use once_cell::sync::Lazy;
+use futures::future::{BoxFuture, LocalBoxFuture};
 
 use crate::{
     client::{
@@ -15,12 +15,11 @@ use crate::{
     utils::PhantomUnsync,
 };
 
-static ASYNC_RT: Lazy<tokio::runtime::Runtime> = Lazy::new(|| {
-    tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .unwrap()
-});
+pub trait IAsyncTaskRuntimeAdapter {
+    fn spawn(&self, future: BoxFuture<'static, ()>) -> u64;
+    fn spawn_local(&self, future: LocalBoxFuture<'static, ()>) -> u64;
+    fn try_abort(&self, task_id: u64);
+}
 
 pub struct MistyAsyncTaskContext {
     pub(crate) inner: Weak<MistyClientInner>,
@@ -32,19 +31,20 @@ pub struct MistyClientAsyncHandleGuard {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-struct MistyAsyncTaskId(u64);
+struct MistyAsyncTask {
+    id: u64,
+    host_task_id: u64,
+}
 
-type InternalMistyTaskSpawnedHandle = tokio::task::JoinHandle<()>;
-
-#[derive(Debug)]
-pub struct MistyAsyncTaskHandle<T> {
-    _id: MistyAsyncTaskId,
-    marker: PhantomData<T>,
+fn alloc_task_id() -> u64 {
+    static ALLOCATED: AtomicU64 = AtomicU64::new(1);
+    let id = ALLOCATED.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    id
 }
 
 #[derive(Debug, Default)]
 struct InternalMistyAsyncTaskPool {
-    internal_handles: HashMap<MistyAsyncTaskId, InternalMistyTaskSpawnedHandle>,
+    async_tasks: HashMap<u64, MistyAsyncTask>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -69,20 +69,10 @@ struct MistyAsyncTaskPoolSpawnCleanupGuard<T>
 where
     T: MistyAsyncTaskTrait,
 {
-    task_id: MistyAsyncTaskId,
+    task_id: u64,
     marker: PhantomData<T>,
     pools: Weak<RwLock<InternalMistyAsyncTaskPools>>,
 }
-
-const _: () = {
-    static ALLOCATED: AtomicU64 = AtomicU64::new(1);
-    impl MistyAsyncTaskId {
-        pub fn alloc() -> Self {
-            let id = ALLOCATED.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-            Self(id)
-        }
-    }
-};
 
 impl<T> Drop for MistyAsyncTaskPoolSpawnCleanupGuard<T>
 where
@@ -95,7 +85,7 @@ where
             let pool = pool.get(&tid);
             if let Some(pool) = pool {
                 let mut pool = pool.pool.write().unwrap();
-                pool.internal_handles.remove(&self.task_id);
+                pool.async_tasks.remove(&self.task_id);
             }
         }
     }
@@ -124,15 +114,15 @@ impl MistyAsyncTaskPools {
         }
     }
 
-    pub(crate) fn reset(&self) {
+    pub(crate) fn reset(&self, rt: &dyn IAsyncTaskRuntimeAdapter) {
         let mut pools = self.pools.write().unwrap();
 
         for (_, pool) in pools.iter() {
             let mut pool = pool.pool.write().unwrap();
-            for (_, handle) in pool.internal_handles.iter() {
-                handle.abort();
+            for (_, task) in pool.async_tasks.iter() {
+                rt.try_abort(task.host_task_id);
             }
-            pool.internal_handles.clear();
+            pool.async_tasks.clear();
         }
         pools.clear();
     }
@@ -145,17 +135,17 @@ where
     pub fn spawn<R, E>(
         &self,
         handle: MistyReadonlyClientHandle,
-        future_fn: impl (FnOnce(MistyAsyncTaskContext) -> R) + Send + Sync + 'static,
-    ) -> MistyAsyncTaskHandle<T>
-    where
+        future_fn: impl (FnOnce(MistyAsyncTaskContext) -> R) + Send + 'static,
+    ) where
         R: std::future::Future<Output = Result<(), E>> + Send + 'static,
         E: std::fmt::Display,
     {
         let inner = handle.inner.clone();
-        let _guard = ASYNC_RT.enter();
-        let task_id = MistyAsyncTaskId::alloc();
+        let cloned_inner = inner.clone();
+        let task_id = alloc_task_id();
 
-        let handle = tokio::spawn(async move {
+        let host_task_id = inner.async_task_runtime.spawn(Box::pin(async move {
+            let inner = cloned_inner;
             let _guard = MistyAsyncTaskPoolSpawnCleanupGuard::<T> {
                 task_id,
                 marker: Default::default(),
@@ -168,53 +158,63 @@ where
                 let e = res.unwrap_err();
                 tracing::error!("spawn error: {}", e);
             }
-        });
+        }));
+
+        let task = MistyAsyncTask {
+            id: task_id,
+            host_task_id,
+        };
         {
             let mut pool = self.pool.write().unwrap();
-            pool.internal_handles.insert(task_id, handle);
-        }
-
-        MistyAsyncTaskHandle {
-            _id: task_id,
-            marker: Default::default(),
+            pool.async_tasks.insert(task_id, task);
         }
     }
 
-    pub async fn wait_all(&self) {
-        loop {
-            let internal_handles = {
-                let mut ret: Vec<InternalMistyTaskSpawnedHandle> = Default::default();
-                let mut pool = self.pool.write().unwrap();
-                let ids: Vec<MistyAsyncTaskId> = pool
-                    .internal_handles
-                    .keys()
-                    .into_iter()
-                    .map(|v| *v)
-                    .collect();
-                for id in ids.into_iter() {
-                    ret.push(pool.internal_handles.remove(&id).unwrap());
-                }
-                pool.internal_handles.clear();
-                ret
+    pub fn spawn_local<R, E>(
+        &self,
+        handle: MistyReadonlyClientHandle,
+        future_fn: impl (FnOnce(MistyAsyncTaskContext) -> R) + 'static,
+    ) where
+        R: std::future::Future<Output = Result<(), E>> + 'static,
+        E: std::fmt::Display,
+    {
+        let inner = handle.inner.clone();
+        let cloned_inner = inner.clone();
+        let task_id = alloc_task_id();
+
+        let host_task_id = inner.async_task_runtime.spawn_local(Box::pin(async move {
+            let inner = cloned_inner;
+            let _guard = MistyAsyncTaskPoolSpawnCleanupGuard::<T> {
+                task_id,
+                marker: Default::default(),
+                pools: Arc::downgrade(&inner.async_task_pools.pools),
             };
-            tracing::info!("wait all handles {}", internal_handles.len());
-            if internal_handles.is_empty() {
-                break;
-            }
 
-            for handle in internal_handles.into_iter() {
-                handle.abort();
+            let ctx = MistyAsyncTaskContext::new(Arc::downgrade(&inner));
+            let res = future_fn(ctx).await;
+            if res.is_err() {
+                let e = res.unwrap_err();
+                tracing::error!("spawn error: {}", e);
             }
+        }));
+
+        let task = MistyAsyncTask {
+            id: task_id,
+            host_task_id,
+        };
+        {
+            let mut pool = self.pool.write().unwrap();
+            pool.async_tasks.insert(task_id, task);
         }
     }
 
-    pub fn cancel_all(&self) {
+    pub fn cancel_all(&self, rt: &dyn IAsyncTaskRuntimeAdapter) {
         let mut pool = self.pool.write().unwrap();
 
-        for (_, handle) in pool.internal_handles.iter() {
-            handle.abort();
+        for (_, task) in pool.async_tasks.iter() {
+            rt.try_abort(task.host_task_id);
         }
-        pool.internal_handles.clear();
+        pool.async_tasks.clear();
     }
 }
 
@@ -275,8 +275,9 @@ pub trait MistyAsyncTaskTrait: Sized + Send + Sync + 'static {
         T: std::future::Future<Output = Result<(), E>> + Send + 'static,
         E: std::fmt::Display,
     {
-        let pool = cx.handle().inner.async_task_pools.get::<Self>();
-        pool.cancel_all();
+        let inner = cx.handle().inner;
+        let pool = inner.async_task_pools.get::<Self>();
+        pool.cancel_all(inner.async_task_runtime.as_ref());
         pool.spawn(cx.readonly_handle().clone(), future_fn);
     }
 
@@ -291,17 +292,33 @@ pub trait MistyAsyncTaskTrait: Sized + Send + Sync + 'static {
         pool.spawn(cx.readonly_handle(), future_fn);
     }
 
-    fn cancel_all<'a>(cx: impl AsMistyClientHandle<'a>) {
-        let pool = cx.handle().inner.async_task_pools.get::<Self>();
-        pool.cancel_all();
+    fn spawn_local_once<'a, T, E>(
+        cx: impl AsMistyClientHandle<'a>,
+        future_fn: impl (FnOnce(MistyAsyncTaskContext) -> T) + 'static,
+    ) where
+        T: std::future::Future<Output = Result<(), E>> + 'static,
+        E: std::fmt::Display,
+    {
+        let inner = cx.handle().inner;
+        let pool = inner.async_task_pools.get::<Self>();
+        pool.cancel_all(inner.async_task_runtime.as_ref());
+        pool.spawn_local(cx.readonly_handle().clone(), future_fn);
     }
 
-    fn wait_all<'a>(cx: &MistyAsyncTaskContext) -> impl std::future::Future<Output = ()> + Send {
-        let handle = cx.handle();
-        let handle = handle.handle();
-        let pool = handle.inner.async_task_pools.get::<Self>();
-        async move {
-            pool.wait_all().await;
-        }
+    fn spawn_local<'a, T, E>(
+        cx: impl AsMistyClientHandle<'a>,
+        future_fn: impl (FnOnce(MistyAsyncTaskContext) -> T) + 'static,
+    ) where
+        T: std::future::Future<Output = Result<(), E>> + 'static,
+        E: std::fmt::Display,
+    {
+        let pool = cx.handle().inner.async_task_pools.get::<Self>();
+        pool.spawn_local(cx.readonly_handle(), future_fn);
+    }
+
+    fn cancel_all<'a>(cx: impl AsMistyClientHandle<'a>) {
+        let inner = cx.handle().inner;
+        let pool = inner.async_task_pools.get::<Self>();
+        pool.cancel_all(inner.async_task_runtime.as_ref());
     }
 }

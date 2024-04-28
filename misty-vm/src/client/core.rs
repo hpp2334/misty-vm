@@ -4,8 +4,12 @@ use std::{
 };
 
 use crate::{
-    async_task::MistyAsyncTaskPools, resources::MistyResourceManager, schedule::ScheduleManager,
-    services::MistyServiceManager, signals::SignalEmitter, states::MistyStateManager,
+    async_task::{IAsyncTaskRuntimeAdapter, MistyAsyncTaskPools},
+    resources::MistyResourceManager,
+    schedule::ScheduleManager,
+    services::MistyServiceManager,
+    signals::SignalEmitter,
+    states::MistyStateManager,
     views::ViewNotifier,
 };
 
@@ -36,6 +40,7 @@ pub(crate) struct MistyClientInner {
     pub service_manager: MistyServiceManager,
     pub resource_manager: MistyResourceManager,
     pub async_task_pools: MistyAsyncTaskPools,
+    pub async_task_runtime: Box<dyn IAsyncTaskRuntimeAdapter + Send + Sync>,
     pub schedule_manager: ScheduleManager,
     pub signal_emitter: SignalEmitter,
     pub destroyed: AtomicBool,
@@ -50,7 +55,8 @@ impl MistyClientInner {
         self.destroyed
             .swap(true, std::sync::atomic::Ordering::SeqCst);
 
-        self.async_task_pools.reset();
+        self.async_task_pools
+            .reset(self.async_task_runtime.as_ref());
     }
 }
 

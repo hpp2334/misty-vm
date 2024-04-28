@@ -161,8 +161,6 @@ fn controller_update(
 
 fn controller_wait_all(ctx: MistyControllerContext, _arg: ()) -> Result<(), Infallible> {
     WaitAllAsyncTask::spawn_once(&ctx, |ctx| async move {
-        OneAsyncTask::wait_all(&ctx).await;
-
         ctx.schedule(|ctx| -> Result<(), Infallible> {
             GlobalState::update(ctx, |state| {
                 state.done = true;

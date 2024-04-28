@@ -8,7 +8,7 @@ use std::{
 use once_cell::sync::Lazy;
 
 use crate::{
-    async_task::MistyAsyncTaskPools,
+    async_task::{IAsyncTaskRuntimeAdapter, MistyAsyncTaskPools},
     controllers::{call_controller, ControllerRet, MistyController},
     resources::MistyResourceManager,
     schedule::{controller_flush_scheduled_tasks, ScheduleManager},
@@ -33,6 +33,7 @@ where
         view_manager: MistyViewModelManager<R>,
         state_manager: MistyStateManager,
         service_manager: MistyServiceManager,
+        async_task_runtime: impl IAsyncTaskRuntimeAdapter + Send + Sync + 'static,
     ) -> Self {
         let inner = Arc::new(MistyClientInner {
             id: MistyClientId::alloc(),
@@ -41,6 +42,7 @@ where
             service_manager,
             resource_manager: MistyResourceManager::new(),
             async_task_pools: MistyAsyncTaskPools::new(),
+            async_task_runtime: Box::new(async_task_runtime),
             schedule_manager: ScheduleManager::new(),
             signal_emitter: SignalEmitter::new(),
             destroyed: AtomicBool::new(false),
@@ -84,6 +86,7 @@ where
         view_manager: MistyViewModelManager<R>,
         state_manager: MistyStateManager,
         service_manager: MistyServiceManager,
+        async_task_runtime: impl IAsyncTaskRuntimeAdapter + Send + Sync + 'static,
     ) {
         let _ = tracing::span!(tracing::Level::INFO, "SingletonMistyClientPod.set").enter();
 
@@ -95,6 +98,7 @@ where
             view_manager,
             state_manager,
             service_manager,
+            async_task_runtime,
         ));
     }
 
