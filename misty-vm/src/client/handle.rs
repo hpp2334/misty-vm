@@ -71,6 +71,12 @@ impl<'a> MistyReadonlyClientHandle<'a> {
             .enqueue(&self.inner.signal_emitter, handler);
     }
 
+    pub fn accessor(&self) -> MistyClientAccessor {
+        MistyClientAccessor {
+            inner: Arc::downgrade(self.inner),
+        }
+    }
+
     pub fn resource_manager(&self) -> &MistyResourceManager {
         &self.inner.resource_manager
     }
