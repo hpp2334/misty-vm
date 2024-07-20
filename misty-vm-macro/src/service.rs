@@ -33,7 +33,7 @@ pub fn parse_misty_service(input: proc_macro2::TokenStream) -> proc_macro2::Toke
 
     let output: proc_macro2::TokenStream = quote! {
         pub struct #marker_name {
-            ptr: Box<dyn #impl_name>,
+            ptr: misty_vm::services::ServiceImplPtr<dyn #impl_name>,
         }
         const _: () = {
             use misty_vm::services::*;
@@ -44,15 +44,28 @@ pub fn parse_misty_service(input: proc_macro2::TokenStream) -> proc_macro2::Toke
             impl #marker_name {
                 pub fn new(service: impl #impl_name + 'static) -> Self {
                     Self {
-                        ptr: Box::new(service),
+                        ptr: ServiceImplPtr::Boxed(Box::new(service)),
+                    }
+                }
+                pub fn new_with_box(service: Box<dyn #impl_name>) -> Self {
+                    Self {
+                        ptr: ServiceImplPtr::Boxed(service),
+                    }
+                }
+                pub fn new_with_arc(service: Arc<dyn #impl_name>) -> Self {
+                    Self {
+                        ptr: ServiceImplPtr::Arc(service),
                     }
                 }
             }
             impl std::ops::Deref for #marker_name {
-                type Target = Box<dyn #impl_name>;
+                type Target = dyn #impl_name;
 
                 fn deref(&self) -> &Self::Target {
-                    &self.ptr
+                    match (&self.ptr) {
+                        ServiceImplPtr::Boxed(ptr) => ptr.as_ref(),
+                        ServiceImplPtr::Arc(ptr) => ptr.as_ref(),
+                    }
                 }
             }
         };

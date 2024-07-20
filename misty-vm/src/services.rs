@@ -38,6 +38,11 @@ pub struct MistyServiceManager {
     services: HashMap<TypeId, Arc<dyn Any + Send + Sync + 'static>>,
 }
 
+pub enum ServiceImplPtr<T: ?Sized> {
+    Boxed(Box<T>),
+    Arc(Arc<T>),
+}
+
 impl MistyServiceManagerBuilder {
     pub fn new() -> Self {
         MistyServiceManagerBuilder {
