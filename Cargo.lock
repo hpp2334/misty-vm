@@ -197,19 +197,20 @@ dependencies = [
 
 [[package]]
 name = "misty-vm"
-version = "0.1.6"
+version = "0.2.0"
 dependencies = [
  "futures",
  "misty-vm-macro",
  "once_cell",
  "serde",
  "thread_local",
+ "tokio",
  "tracing",
 ]
 
 [[package]]
 name = "misty-vm-macro"
-version = "0.1.4"
+version = "0.2.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -218,7 +219,7 @@ dependencies = [
 
 [[package]]
 name = "misty-vm-test"
-version = "0.1.4"
+version = "0.2.0"
 dependencies = [
  "futures",
  "misty-vm",
