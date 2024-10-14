@@ -5,6 +5,7 @@ use std::{
         atomic::{AtomicBool, AtomicI32},
         Arc,
     },
+    time::Duration,
 };
 
 use crate::{
@@ -35,7 +36,7 @@ impl AppInternal {
         Event: 'static,
     {
         let app = self.clone();
-        self.spawn_local(async move {
+        self.async_tasks.spawn_local(async move {
             app.emit(evt);
         });
     }
@@ -66,10 +67,7 @@ impl AppInternal {
         self.to_hosts.get::<C>()
     }
 
-    pub fn spawn_local<Fut>(&self, fut: Fut)
-    where
-        Fut: Future<Output = ()> + 'static,
-    {
-        self.async_tasks.spawn_local(fut);
+    pub fn async_tasks(&self) -> &AsyncTasks {
+        &self.async_tasks
     }
 }

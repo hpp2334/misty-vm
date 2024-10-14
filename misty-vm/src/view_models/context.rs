@@ -1,4 +1,4 @@
-use std::{future::Future, sync::Arc};
+use std::{future::Future, sync::Arc, time::Duration};
 
 use crate::{internal::AppInternal, utils::PhantomUnsend, IToHost, Model};
 
@@ -53,7 +53,11 @@ impl ViewModelContext {
         Fut: Future<Output = ()> + 'static,
     {
         let fut = f(self.clone_internal());
-        self._app.spawn_local(fut);
+        self._app.async_tasks().spawn_local(fut);
+    }
+
+    pub async fn sleep(&self, duration: Duration) {
+        self._app.async_tasks().sleep(duration).await
     }
 
     pub fn enqueue_emit<Event>(&self, evt: Event)

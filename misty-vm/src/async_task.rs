@@ -1,15 +1,13 @@
 use std::{
-    any::TypeId,
-    collections::HashMap,
-    future::Future,
-    marker::PhantomData,
-    sync::{atomic::AtomicU64, Arc, RwLock, Weak},
-};
+    future::Future, time::Duration}
+;
 
-use futures::future::{BoxFuture, LocalBoxFuture};
+use futures::future::LocalBoxFuture;
 
 pub trait IAsyncRuntimeAdapter: 'static {
     fn spawn_local(&self, future: LocalBoxFuture<'static, ()>) -> u64;
+    fn sleep(&self, duration: std::time::Duration) -> LocalBoxFuture<'static, ()>;
+    fn get_time(&self) -> std::time::Duration;
 }
 
 pub struct AsyncTasks {
@@ -29,12 +27,24 @@ impl AsyncTasks {
     {
         self.adapter.spawn_local(Box::pin(fut));
     }
+
+    pub async fn sleep(&self, duration: Duration) {
+        self.adapter.sleep(duration).await
+    }
 }
 
 pub(crate) struct DefaultAsyncRuntimeAdapter;
 
 impl IAsyncRuntimeAdapter for DefaultAsyncRuntimeAdapter {
     fn spawn_local(&self, _future: LocalBoxFuture<'static, ()>) -> u64 {
+        panic!("async runtime adapter not registered")
+    }
+
+    fn sleep(&self, _duration: std::time::Duration) -> LocalBoxFuture<'static, ()> {
+        panic!("async runtime adapter not registered")
+    }
+
+    fn get_time(&self) -> std::time::Duration {
         panic!("async runtime adapter not registered")
     }
 }
